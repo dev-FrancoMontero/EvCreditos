@@ -1,14 +1,4 @@
--- =====================================================================
--- Sistema Evaluador de Créditos - Stored Procedures (ABML)
--- Toda la aplicación accede a la base solo a través de estos procedimientos.
---
--- Errores de validación: se lanzan con SIGNAL SQLSTATE '45000' y un mensaje
--- en castellano. En Java llegan como SQLException; e.getMessage() devuelve
--- ese mensaje, listo para mostrar en un JOptionPane.
---
--- Modificaciones y bajas devuelven en un parámetro OUT la cantidad de
--- filas afectadas: 0 significa que el id no existía (no es un error).
--- =====================================================================
+
 
 USE Creditos;
 
