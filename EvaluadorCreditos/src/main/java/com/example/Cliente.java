@@ -1,66 +1,71 @@
 package com.example;
 
+/**
+ * Datos comunes a todo cliente. Cada subtipo define su propia regla
+ * de evaluación en {@link #evaluarRiesgo()}.
+ */
 public abstract class Cliente {
+    private int id;
     private String nombre;
-    private int gastos;
-    private int ingresos;
+    private double ingresos;
+    private double gastos;
     private boolean tieneBuenHistorial;
-    public String getNombre() {
-        return nombre;
-    }
-    public void setNombre(String nombre) {
+
+    protected Cliente(String nombre, double ingresos, double gastos, boolean tieneBuenHistorial) {
         this.nombre = nombre;
-    }
-    public int getGastos() {
-        return gastos;
-    }
-    public void setGastos(int gastos) {
-        this.gastos = gastos;
-    }
-    public int getIngresos() {
-        return ingresos;
-    }
-    public void setIngresos(int ingresos) {
         this.ingresos = ingresos;
-    }
-    public boolean isTieneBuenHistorial() {
-        return tieneBuenHistorial;
-    }
-    public void setTieneBuenHistorial(boolean tieneBuenHistorial) {
+        this.gastos = gastos;
         this.tieneBuenHistorial = tieneBuenHistorial;
     }
 
-    public abstract int evaluarRiesgo();
-}
+    /**
+     * Evalúa el perfil financiero del cliente.
+     *
+     * @return true si el cliente es apto para recibir el préstamo
+     */
+    public abstract boolean evaluarRiesgo();
 
-class PersonaFisica extends Cliente {
+    /** Nombre del tipo de cliente para mostrar en pantalla. */
+    public abstract String getTipo();
 
-    @Override 
-    public int evaluarRiesgo() {
-    
-        if (isTieneBuenHistorial() == false) {
-            return 0;
-        }
-        else {
-            return getIngresos() - getGastos();
-        }
+    /** 0 mientras el cliente no se haya guardado en la base. */
+    public int getId() {
+        return id;
     }
-}
 
-class Empresa extends Cliente {
+    public void setId(int id) {
+        this.id = id;
+    }
 
-    private String rubro;
-    private String director;
+    public String getNombre() {
+        return nombre;
+    }
 
-    @Override 
-    public int evaluarRiesgo() {
-        int div = getIngresos() / getGastos();
+    public void setNombre(String nombre) {
+        this.nombre = nombre;
+    }
 
-        if (div < 1) {
-            return 0;
-        }
-        else {
-            return div;
-        }
+    public double getIngresos() {
+        return ingresos;
+    }
+
+    public void setIngresos(double ingresos) {
+        this.ingresos = ingresos;
+    }
+
+    public double getGastos() {
+        return gastos;
+    }
+
+    public void setGastos(double gastos) {
+        this.gastos = gastos;
+    }
+
+    public boolean isTieneBuenHistorial() {
+        return tieneBuenHistorial;
+    }
+
+    public void setTieneBuenHistorial(boolean tieneBuenHistorial) {
+        this.tieneBuenHistorial = tieneBuenHistorial;
     }
 }
