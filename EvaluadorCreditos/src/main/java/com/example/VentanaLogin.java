@@ -1,10 +1,9 @@
 package com.example;
 
+import com.example.servicio.UsuarioServicio;
+
 import java.awt.BorderLayout;
 import java.awt.GridLayout;
-import java.sql.Connection;
-import java.sql.PreparedStatement;
-import java.sql.ResultSet;
 import java.sql.SQLException;
 
 import javax.swing.BorderFactory;
@@ -22,6 +21,7 @@ public class VentanaLogin extends JFrame {
     private final JTextField campoUsuario = new JTextField(15);
     private final JPasswordField campoClave = new JPasswordField(15);
     private final JButton botonIngresar = new JButton("Ingresar");
+    private final UsuarioServicio usuarioServicio = new UsuarioServicio();
 
     public VentanaLogin() {
         super("Evaluador de Créditos - Ingreso");
@@ -60,7 +60,7 @@ public class VentanaLogin extends JFrame {
         }
 
         try {
-            if (validarAcceso(usuario, clave)) {
+            if (usuarioServicio.iniciarSesion(usuario, clave)) {
                 dispose();
                 new VentanaPrincipal(usuario).setVisible(true);
             } else {
@@ -73,19 +73,6 @@ public class VentanaLogin extends JFrame {
             JOptionPane.showMessageDialog(this,
                     "No se pudo conectar con la base de datos:\n" + ex.getMessage(),
                     "Error de conexión", JOptionPane.ERROR_MESSAGE);
-        }
-    }
-
-    private boolean validarAcceso(String usuario, String clave) throws SQLException {
-        // La conexión es compartida (ConexionBD), por eso solo se cierran la sentencia y el resultado
-        Connection conn = ConexionBD.getConnection();
-        String sql = "SELECT id_usuario FROM usuarios WHERE nombre_usuario = ? AND clave = ?";
-        try (PreparedStatement ps = conn.prepareStatement(sql)) {
-            ps.setString(1, usuario);
-            ps.setString(2, clave);
-            try (ResultSet rs = ps.executeQuery()) {
-                return rs.next();
-            }
         }
     }
 

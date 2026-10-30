@@ -1,15 +1,13 @@
 package com.example;
 
+import com.example.servicio.UsuarioServicio;
+
 import java.awt.BorderLayout;
 import java.awt.FlowLayout;
 import java.awt.GridLayout;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
-import java.sql.Connection;
-import java.sql.PreparedStatement;
-import java.sql.ResultSet;
 import java.sql.SQLException;
-import java.sql.SQLIntegrityConstraintViolationException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.ExecutionException;
@@ -43,6 +41,7 @@ public class VentanaUsuarios extends JFrame {
     private final JButton botonEliminarUsuario = new JButton("Eliminar");
     private final JButton botonRefrescar = new JButton("Refrescar");
     private final JProgressBar barraProgreso = new JProgressBar();
+    private final UsuarioServicio usuarioServicio = new UsuarioServicio();
 
     // El id queda en el modelo aunque su columna no se muestre: lo necesita la eliminación
     private final DefaultTableModel modeloUsuarios = new DefaultTableModel(new Object[]{"ID", "Usuario"}, 0) {
@@ -166,7 +165,7 @@ public class VentanaUsuarios extends JFrame {
         new SwingWorker<Void, Void>() {
             @Override
             protected Void doInBackground() throws Exception {
-                insertarUsuario(nombre, clave);
+                usuarioServicio.alta(nombre, clave);
                 return null;
             }
 
@@ -210,7 +209,7 @@ public class VentanaUsuarios extends JFrame {
         new SwingWorker<Boolean, Void>() {
             @Override
             protected Boolean doInBackground() throws Exception {
-                return eliminarUsuario(id);
+                return usuarioServicio.baja(id);
             }
 
             @Override
@@ -257,42 +256,15 @@ public class VentanaUsuarios extends JFrame {
         }.execute();
     }
 
-    // ---------- Acceso a la base (usa la conexión compartida de ConexionBD) ----------
-
-    private void insertarUsuario(String nombre, String clave) throws SQLException {
-        Connection conn = ConexionBD.getConnection();
-        String sql = "INSERT INTO usuarios (nombre_usuario, clave) VALUES (?, ?)";
-        try (PreparedStatement ps = conn.prepareStatement(sql)) {
-            ps.setString(1, nombre);
-            ps.setString(2, clave);
-            ps.executeUpdate();
-        } catch (SQLIntegrityConstraintViolationException e) {
-            throw new SQLException("El usuario \"" + nombre + "\" ya existe", e);
-        }
-    }
+    // ---------- Acceso a la base (a través de UsuarioServicio) ----------
 
     // Devuelve id y nombre de usuario, sin la clave
     private List<Object[]> listarUsuarios() throws SQLException {
-        Connection conn = ConexionBD.getConnection();
-        String sql = "SELECT id_usuario, nombre_usuario FROM usuarios ORDER BY id_usuario";
         List<Object[]> filas = new ArrayList<>();
-        try (PreparedStatement ps = conn.prepareStatement(sql);
-             ResultSet rs = ps.executeQuery()) {
-            while (rs.next()) {
-                filas.add(new Object[]{rs.getInt("id_usuario"), rs.getString("nombre_usuario")});
-            }
+        for (Usuario usuario : usuarioServicio.listar()) {
+            filas.add(new Object[]{usuario.getId(), usuario.getNombre()});
         }
         return filas;
-    }
-
-    // Devuelve true si se eliminó una fila, false si el id no existía
-    private boolean eliminarUsuario(int id) throws SQLException {
-        Connection conn = ConexionBD.getConnection();
-        String sql = "DELETE FROM usuarios WHERE id_usuario = ?";
-        try (PreparedStatement ps = conn.prepareStatement(sql)) {
-            ps.setInt(1, id);
-            return ps.executeUpdate() > 0;
-        }
     }
 
     private void iniciarCarga(String mensaje) {

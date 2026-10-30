@@ -1,15 +1,13 @@
 package com.example;
 
+import com.example.servicio.ClienteServicio;
+
 import java.awt.BorderLayout;
 import java.awt.GridBagConstraints;
 import java.awt.GridBagLayout;
 import java.awt.Insets;
 import java.awt.event.ActionEvent;
-import java.sql.Connection;
-import java.sql.PreparedStatement;
-import java.sql.ResultSet;
 import java.sql.SQLException;
-import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.ExecutionException;
@@ -93,6 +91,7 @@ public class VentanaPrincipal extends JFrame {
         }
     };
 
+    private final ClienteServicio clienteServicio = new ClienteServicio();
     private VentanaUsuarios ventanaUsuarios;
 
     public VentanaPrincipal(String usuarioLogueado) {
@@ -214,23 +213,18 @@ public class VentanaPrincipal extends JFrame {
         repaint();
     }
 
-    // Arma la instancia de Cliente que corresponde al tipo elegido, usando los setters de Cliente
-    private Cliente crearCliente(boolean esEmpresa, String nombre, int ingresos, int gastos, boolean historial) {
-        Cliente cliente = esEmpresa ? new Empresa() : new PersonaFisica();
-        cliente.setNombre(nombre);
-        cliente.setIngresos(ingresos);
-        cliente.setGastos(gastos);
-        cliente.setTieneBuenHistorial(historial);
-        return cliente;
+    // Arma la instancia de Cliente que corresponde al tipo elegido
+    private Cliente crearCliente(boolean esEmpresa, String nombre, double ingresos, double gastos,
+                                 boolean historial, String rubro, String director) {
+        if (esEmpresa) {
+            return new Empresa(nombre, ingresos, gastos, historial, rubro, director);
+        }
+        return new PersonaFisica(nombre, ingresos, gastos, historial);
     }
 
-    // Llama a evaluarRiesgo() y muestra un texto si la evaluación no se puede calcular
+    // Resultado de evaluarRiesgo() para mostrar en pantalla
     private String textoRiesgo(Cliente cliente) {
-        try {
-            return String.valueOf(cliente.evaluarRiesgo());
-        } catch (ArithmeticException ex) {
-            return "No calculable (gastos en 0)";
-        }
+        return clienteServicio.evaluar(cliente) ? "Apto" : "No apto";
     }
 
     private void guardarCliente() {
@@ -253,19 +247,13 @@ public class VentanaPrincipal extends JFrame {
             return;
         }
 
-        Cliente cliente = crearCliente(esEmpresa, nombre, ingresos, gastos, historial);
+        Cliente cliente = crearCliente(esEmpresa, nombre, ingresos, gastos, historial, rubro, director);
 
         iniciarCarga("Guardando cliente...");
         new SwingWorker<Integer, Void>() {
             @Override
             protected Integer doInBackground() throws Exception {
-                int id = insertarCliente(cliente);
-                if (esEmpresa) {
-                    insertarEmpresa(id, rubro, director);
-                } else {
-                    insertarPersonaFisica(id);
-                }
-                return id;
+                return clienteServicio.alta(cliente);
             }
 
             @Override
@@ -308,75 +296,24 @@ public class VentanaPrincipal extends JFrame {
         }.execute();
     }
 
-    // ---------- Acceso a la base (usa la conexión compartida de ConexionBD) ----------
+    // ---------- Acceso a la base (a través de ClienteServicio) ----------
 
-    private int insertarCliente(Cliente cliente) throws SQLException {
-        Connection conn = ConexionBD.getConnection();
-        String sql = "INSERT INTO clientes (nombre, gastos, ingresos, tieneBuenHistorial) VALUES (?, ?, ?, ?)";
-        try (PreparedStatement ps = conn.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
-            ps.setString(1, cliente.getNombre());
-            ps.setInt(2, cliente.getGastos());
-            ps.setInt(3, cliente.getIngresos());
-            ps.setBoolean(4, cliente.isTieneBuenHistorial());
-            ps.executeUpdate();
-            try (ResultSet rs = ps.getGeneratedKeys()) {
-                if (rs.next()) {
-                    return rs.getInt(1);
-                }
-            }
-        }
-        throw new SQLException("No se pudo obtener el id generado del cliente");
-    }
-
-    private void insertarPersonaFisica(int idCliente) throws SQLException {
-        Connection conn = ConexionBD.getConnection();
-        String sql = "INSERT INTO personas_fisicas (id_cliente) VALUES (?)";
-        try (PreparedStatement ps = conn.prepareStatement(sql)) {
-            ps.setInt(1, idCliente);
-            ps.executeUpdate();
-        }
-    }
-
-    private void insertarEmpresa(int idCliente, String rubro, String director) throws SQLException {
-        Connection conn = ConexionBD.getConnection();
-        String sql = "INSERT INTO empresas (id_cliente, rubro, director) VALUES (?, ?, ?)";
-        try (PreparedStatement ps = conn.prepareStatement(sql)) {
-            ps.setInt(1, idCliente);
-            ps.setString(2, rubro);
-            ps.setString(3, director);
-            ps.executeUpdate();
-        }
-    }
-
+    // Convierte cada cliente en una fila de la tabla
     private List<Object[]> consultarClientes() throws SQLException {
-        Connection conn = ConexionBD.getConnection();
-        String sql = "SELECT c.id_cliente, c.nombre, c.ingresos, c.gastos, c.tieneBuenHistorial, "
-                   + "e.id_empresa, e.rubro, e.director "
-                   + "FROM clientes c LEFT JOIN empresas e ON e.id_cliente = c.id_cliente "
-                   + "ORDER BY c.id_cliente";
         List<Object[]> filas = new ArrayList<>();
-        try (PreparedStatement ps = conn.prepareStatement(sql);
-             ResultSet rs = ps.executeQuery()) {
-            while (rs.next()) {
-                int ingresos = rs.getInt("ingresos");
-                int gastos = rs.getInt("gastos");
-                boolean historial = rs.getBoolean("tieneBuenHistorial");
-                rs.getInt("id_empresa");
-                boolean esEmpresa = !rs.wasNull();
-
-                Cliente cliente = crearCliente(esEmpresa, rs.getString("nombre"), ingresos, gastos, historial);
-                filas.add(new Object[]{
-                        rs.getInt("id_cliente"),
-                        esEmpresa ? EMPRESA : PERSONA_FISICA,
-                        cliente.getNombre(),
-                        ingresos,
-                        gastos,
-                        historial ? "Sí" : "No",
-                        esEmpresa ? rs.getString("rubro") : "",
-                        esEmpresa ? rs.getString("director") : "",
-                        textoRiesgo(cliente)
-                });
-            }
+        for (Cliente cliente : clienteServicio.listar()) {
+            Empresa empresa = cliente instanceof Empresa e ? e : null;
+            filas.add(new Object[]{
+                    cliente.getId(),
+                    cliente.getTipo(),
+                    cliente.getNombre(),
+                    cliente.getIngresos(),
+                    cliente.getGastos(),
+                    cliente.isTieneBuenHistorial() ? "Sí" : "No",
+                    empresa != null ? empresa.getRubro() : "",
+                    empresa != null ? empresa.getDirector() : "",
+                    textoRiesgo(cliente)
+            });
         }
         return filas;
     }
